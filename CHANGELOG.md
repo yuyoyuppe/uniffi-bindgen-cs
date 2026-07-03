@@ -1,3 +1,17 @@
+### Unreleased
+- Extend the `high_performance_strings` span fast path to synchronous object methods: methods
+  with plain string/bytes arguments get a `{Name}Span(ReadOnlySpan<byte> ...)` variant and the
+  standard overload delegates through it, mirroring the existing top-level function support.
+- The span fast path is now fully generated end to end: the companion
+  [uniffi-rs fork](https://github.com/yuyoyuppe/uniffi-rs) (`raw-scaffolding` branch) makes
+  `#[uniffi::export]` emit the `_raw` scaffolding exports automatically, so enabling
+  `high_performance_strings` no longer requires hand-written symbols — but the component **must**
+  be built against that fork (e.g. via `[patch.crates-io]`); a library built with upstream
+  uniffi-rs will miss the `_raw` entry points and every string/bytes-taking call will throw
+  `EntryPointNotFoundException`.
+- Add a `span-fast-path` fixture (opted in via its `uniffi.toml`) with binding tests covering
+  both overloads, mixed arguments, empty spans, invalid UTF-8, error propagation, and method
+  receivers.
 ### v0.11.0+v0.31.0
 - **BREAKING** Upgrade to [UniFFI 0.31.0](https://mozilla.github.io/uniffi-rs/latest/Upgrading.html)
   - Removed `--lib-file` CLI argument (library files are now auto-detected)

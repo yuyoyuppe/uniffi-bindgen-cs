@@ -27,6 +27,7 @@ mod uniffi_fixtures {
     uniffi_cs_optional_parameters::uniffi_reexport_scaffolding!();
     uniffi_cs_positional_enums::uniffi_reexport_scaffolding!();
     uniffi_cs_repr_enums::uniffi_reexport_scaffolding!();
+    span_fast_path::uniffi_reexport_scaffolding!();
     stringify::uniffi_reexport_scaffolding!();
     issue_28::uniffi_reexport_scaffolding!();
     issue_60::uniffi_reexport_scaffolding!();

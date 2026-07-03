@@ -14,3 +14,8 @@ uniffi_build = { version = "0.31.0", features=["builtin-bindgen"] }
 uniffi_bindgen = "0.31.0"
 uniffi_meta = "0.31.0"
 uniffi_udl = "0.31.0"
+[patch.crates-io]
+# Our uniffi-rs fork: the proc macros additionally emit `_raw` span-fast-path scaffolding
+# exports consumed by the high_performance_strings option. Keep in lockstep with this repo.
+uniffi = { git = "https://github.com/yuyoyuppe/uniffi-rs", rev = "38ba77297cf0b0145a469ef4fc7ae13c78c17ecc" }
+uniffi_macros = { git = "https://github.com/yuyoyuppe/uniffi-rs", rev = "38ba77297cf0b0145a469ef4fc7ae13c78c17ecc" }

@@ -67,6 +67,25 @@ uniffi-bindgen-cs path/to/definitions.udl --config path/to/uniffi.toml
     omit_checksums = true
     ```
 
+- `high_performance_strings` - when set to `true`, every synchronous top-level function and
+    object method with a plain `String`/`bytes` argument gets an additional
+    `{Name}Span(ReadOnlySpan<byte> ...)` overload that pins the span and passes it as a borrowed
+    pointer + length pair, skipping the RustBuffer allocation and copy; the standard overload
+    transparently delegates to it (a single `UTF8.GetBytes` per string), and callers that already
+    hold UTF-8 bytes get a zero-copy crossing. Arguments only - return values still use
+    RustBuffer - and async functions and constructors are not covered.
+
+    **Requires the component to be built against our
+    [uniffi-rs fork](https://github.com/yuyoyuppe/uniffi-rs)** (`raw-scaffolding` branch, e.g. via
+    `[patch.crates-io]`), whose `#[uniffi::export]` emits the `_raw` scaffolding entry points the
+    span overloads call. A library built with upstream uniffi-rs will miss those exports and every
+    string/bytes-taking call will throw `EntryPointNotFoundException`. Span eligibility is matched
+    syntactically on the Rust side (`String`, `&str`, `Vec<u8>`, `&[u8]` spelled literally) - do
+    not use type aliases for these in exported signatures.
+    ```toml
+    [bindings.csharp]
+    high_performance_strings = true
+    ```
 - `rename` - override the generated C# name for types, variants, methods, and fields. Keys are
     dotted paths to the component being renamed; values are tables with a `name` field.
     ```toml

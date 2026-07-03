@@ -26,6 +26,7 @@ uniffi-cs-disposable-fixture = { path = "disposable" }
 uniffi-cs-optional-parameters-fixture = { path = "optional-parameters" }
 uniffi-cs-positional-enums = { path = "positional-enums" }
 uniffi-cs-repr-enums = { path = "repr-enums" }
+uniffi-cs-span-fast-path = { path = "span-fast-path" }
 uniffi-cs-stringify = { path = "stringify" }
 
 # Local ext-types fixtures

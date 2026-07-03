@@ -68,6 +68,17 @@ pub(super) fn has_span_arguments(
         .any(|arg| is_span_fast_path_type(&arg.as_type())))
 }
 
+/// [`has_span_arguments`] for object methods.
+pub(super) fn has_span_arguments_method(
+    method: &uniffi_bindgen::interface::Method,
+) -> Result<bool, askama::Error> {
+    use uniffi_bindgen::interface::AsType;
+    Ok(method
+        .arguments()
+        .iter()
+        .any(|arg| is_span_fast_path_type(&arg.as_type())))
+}
+
 pub(super) fn ffi_converter_name(as_ct: &impl AsCodeType) -> Result<String, askama::Error> {
     Ok(as_ct.as_codetype().ffi_converter_name())
 }

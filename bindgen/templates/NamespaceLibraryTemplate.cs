@@ -73,6 +73,30 @@ static class _UniFFILib {
 
     {% endif %}
     {% endfor %}
+    {#/* Generate _raw FFI declarations for sync object methods with string/bytes parameters.
+         The first parameter is the object handle, matching the standard method scaffolding. */#}
+    {% for obj in ci.object_definitions() %}
+    {% for meth in obj.methods() %}
+    {%- if !meth.is_async() %}
+    {%- if meth|has_span_arguments_method %}
+    [DllImport("{{ config.cdylib_name() }}", CallingConvention = CallingConvention.Cdecl)]
+    public static extern unsafe {% match meth.ffi_func().return_type() %}{%- when Some with (type_) %} {{ type_.borrow()|ffi_type_name }}{% when None %} void{% endmatch %} {{ meth.ffi_func().name() }}_raw(
+        ulong @ptr,
+        {%- for arg in meth.arguments() %}
+        {%- if arg|is_span_arg %}
+        byte* {{ arg.name()|var_name }}_ptr,
+        int {{ arg.name()|var_name }}_len{%- if !loop.last -%},{%- else -%}{%- if meth.ffi_func().has_rust_call_status_arg() -%},{%- endif -%}{%- endif -%}
+        {%- else %}
+        {% match arg|ffi_type %}{%- when type_ %}{{ type_|arg_type_name }}{% endmatch %} {{ arg.name()|var_name }}{%- if !loop.last || meth.ffi_func().has_rust_call_status_arg() -%},{%- endif -%}
+        {%- endif %}
+        {%- endfor %}
+        {%- if meth.ffi_func().has_rust_call_status_arg() %}ref UniffiRustCallStatus _uniffi_out_err{% endif %}
+    );
+
+    {% endif %}
+    {% endif %}
+    {% endfor %}
+    {% endfor %}
     {%- endif %}
 
     static void uniffiCheckContractApiVersion() {

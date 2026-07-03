@@ -16,6 +16,8 @@
 
     <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
         <PackageReference Include="PolySharp" Version="1.15.0"/>
+        <!-- ReadOnlySpan<byte> for the high_performance_strings span fast path -->
+        <PackageReference Include="System.Memory" Version="4.5.5"/>
     </ItemGroup>
 
     <ItemGroup Condition="'$(SKIP_FIXTURE_COPY)' != 'true' and $([MSBuild]::IsOsPlatform('Windows')) == 'true'">

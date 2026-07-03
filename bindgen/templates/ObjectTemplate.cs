@@ -139,6 +139,24 @@
     {%- match meth.return_type() -%}
     {%- when Some with (return_type) %}
     public {% if is_error && meth.name()|method_name(impl_name) == "Message" %}new {% endif %}{{ return_type|type_name(ci) }} {{ meth.name()|method_name(impl_name) }}({% call cs::arg_list_decl(meth) %}) {
+        {%- if config.high_performance_strings() && meth|has_span_arguments_method %}
+        {#/* Delegate to the span variant, encoding string arguments as UTF-8 */#}
+        {%- for arg in meth.arguments() %}
+        {%- if arg|type_name(ci) == "string" %}
+        var {{ arg.name()|var_name }}Utf8 = System.Text.Encoding.UTF8.GetBytes({{ arg.name()|var_name }});
+        {%- endif %}
+        {%- endfor %}
+        return {{ meth.name()|method_name(impl_name) }}Span(
+            {%- for arg in meth.arguments() %}
+            {%- if arg|type_name(ci) == "string" %}
+            {{ arg.name()|var_name }}Utf8
+            {%- else %}
+            {{ arg.name()|var_name }}
+            {%- endif %}
+            {%- if !loop.last %}, {% endif %}
+            {%- endfor %}
+        );
+        {%- else %}
         IncrementCallCounter();
         try {
             var _thisPtr = CloneRustArcPtr();
@@ -147,10 +165,29 @@
         } finally {
             DecrementCallCounter();
         }
+        {%- endif %}
     }
 
     {%- when None %}
     public {% if is_error && meth.name()|method_name(impl_name) == "Message" %}new {% endif %}void {{ meth.name()|method_name(impl_name) }}({% call cs::arg_list_decl(meth) %}) {
+        {%- if config.high_performance_strings() && meth|has_span_arguments_method %}
+        {#/* Delegate to the span variant, encoding string arguments as UTF-8 */#}
+        {%- for arg in meth.arguments() %}
+        {%- if arg|type_name(ci) == "string" %}
+        var {{ arg.name()|var_name }}Utf8 = System.Text.Encoding.UTF8.GetBytes({{ arg.name()|var_name }});
+        {%- endif %}
+        {%- endfor %}
+        {{ meth.name()|method_name(impl_name) }}Span(
+            {%- for arg in meth.arguments() %}
+            {%- if arg|type_name(ci) == "string" %}
+            {{ arg.name()|var_name }}Utf8
+            {%- else %}
+            {{ arg.name()|var_name }}
+            {%- endif %}
+            {%- if !loop.last %}, {% endif %}
+            {%- endfor %}
+        );
+        {%- else %}
         IncrementCallCounter();
         try {
             var _thisPtr = CloneRustArcPtr();
@@ -158,8 +195,135 @@
         } finally {
             DecrementCallCounter();
         }
+        {%- endif %}
     }
     {% endmatch %}
+
+    {%- if config.high_performance_strings() %}
+    {%- if !meth.is_async() %}
+    {%- if meth|has_span_arguments_method %}
+
+    /// <summary>
+    /// High-performance variant using ReadOnlySpan&lt;byte&gt; for zero-copy handling.
+    /// String parameters are passed as UTF-8 encoded spans and byte arrays as raw
+    /// spans, avoiding RustBuffer allocations.
+    /// </summary>
+{%- call cs::method_throws_annotation(meth.throws_type()) %}
+    {%- match meth.return_type() -%}
+    {%- when Some with (return_type) %}
+    public unsafe {{ return_type|type_name(ci) }} {{ meth.name()|method_name(impl_name) }}Span(
+        {%- for arg in meth.arguments() -%}
+            {%- if arg|type_name(ci) == "string" -%}
+                ReadOnlySpan<byte> {{ arg.name()|var_name }}Utf8
+            {%- else if arg|is_span_arg -%}
+                ReadOnlySpan<byte> {{ arg.name()|var_name }}
+            {%- else -%}
+                {{ arg|type_name(ci) }} {{ arg.name()|var_name }}
+            {%- endif -%}
+            {%- if !loop.last %}, {% endif -%}
+        {%- endfor -%}
+    ) {
+        IncrementCallCounter();
+        try {
+            var _thisPtr = CloneRustArcPtr();
+            UniffiRustCallStatus _status = default;
+
+            {%- for arg in meth.arguments() %}
+            {%- if arg|type_name(ci) == "string" %}
+            fixed (byte* {{ arg.name()|var_name }}Ptr = {{ arg.name()|var_name }}Utf8)
+            {%- else if arg|is_span_arg %}
+            fixed (byte* {{ arg.name()|var_name }}Ptr = {{ arg.name()|var_name }})
+            {%- endif %}
+            {%- endfor %}
+            {
+                var result = _UniFFILib.{{ meth.ffi_func().name() }}_raw(
+                    _thisPtr,
+                    {%- for arg in meth.arguments() %}
+                    {%- if arg|type_name(ci) == "string" %}
+                    {{ arg.name()|var_name }}Ptr,
+                    {{ arg.name()|var_name }}Utf8.Length
+                    {%- else if arg|is_span_arg %}
+                    {{ arg.name()|var_name }}Ptr,
+                    {{ arg.name()|var_name }}.Length
+                    {%- else %}
+                    {{ arg|lower_fn }}({{ arg.name()|var_name }})
+                    {%- endif %}
+                    {%- if !loop.last %},{% else %},{% endif %}
+                    {%- endfor %}
+                    ref _status
+                );
+
+                {%- match meth.throws_type() %}
+                {%- when Some with (e) %}
+                _UniffiHelpers.CheckCallStatus({{ e|error_converter_name }}.INSTANCE, ref _status);
+                {%- else %}
+                _UniffiHelpers.CheckCallStatus(NullCallStatusErrorHandler.INSTANCE, ref _status);
+                {%- endmatch %}
+
+                return {{ return_type|lift_fn }}(result);
+            }
+        } finally {
+            DecrementCallCounter();
+        }
+    }
+    {% when None %}
+    public unsafe void {{ meth.name()|method_name(impl_name) }}Span(
+        {%- for arg in meth.arguments() -%}
+            {%- if arg|type_name(ci) == "string" -%}
+                ReadOnlySpan<byte> {{ arg.name()|var_name }}Utf8
+            {%- else if arg|is_span_arg -%}
+                ReadOnlySpan<byte> {{ arg.name()|var_name }}
+            {%- else -%}
+                {{ arg|type_name(ci) }} {{ arg.name()|var_name }}
+            {%- endif -%}
+            {%- if !loop.last %}, {% endif -%}
+        {%- endfor -%}
+    ) {
+        IncrementCallCounter();
+        try {
+            var _thisPtr = CloneRustArcPtr();
+            UniffiRustCallStatus _status = default;
+
+            {%- for arg in meth.arguments() %}
+            {%- if arg|type_name(ci) == "string" %}
+            fixed (byte* {{ arg.name()|var_name }}Ptr = {{ arg.name()|var_name }}Utf8)
+            {%- else if arg|is_span_arg %}
+            fixed (byte* {{ arg.name()|var_name }}Ptr = {{ arg.name()|var_name }})
+            {%- endif %}
+            {%- endfor %}
+            {
+                _UniFFILib.{{ meth.ffi_func().name() }}_raw(
+                    _thisPtr,
+                    {%- for arg in meth.arguments() %}
+                    {%- if arg|type_name(ci) == "string" %}
+                    {{ arg.name()|var_name }}Ptr,
+                    {{ arg.name()|var_name }}Utf8.Length
+                    {%- else if arg|is_span_arg %}
+                    {{ arg.name()|var_name }}Ptr,
+                    {{ arg.name()|var_name }}.Length
+                    {%- else %}
+                    {{ arg|lower_fn }}({{ arg.name()|var_name }})
+                    {%- endif %}
+                    {%- if !loop.last %},{% else %},{% endif %}
+                    {%- endfor %}
+                    ref _status
+                );
+
+                {%- match meth.throws_type() %}
+                {%- when Some with (e) %}
+                _UniffiHelpers.CheckCallStatus({{ e|error_converter_name }}.INSTANCE, ref _status);
+                {%- else %}
+                _UniffiHelpers.CheckCallStatus(NullCallStatusErrorHandler.INSTANCE, ref _status);
+                {%- endmatch %}
+            }
+        } finally {
+            DecrementCallCounter();
+        }
+    }
+    {% endmatch %}
+    {%- endif %}
+    {%- endif %}
+    {%- endif %}
     {% endif %}
     {% endfor %}
 
