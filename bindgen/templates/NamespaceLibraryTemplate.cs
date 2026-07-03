@@ -54,6 +54,27 @@ static class _UniFFILib {
 
     {% endfor %}
 
+    {%- if config.high_performance_strings() %}
+    {#/* Generate _raw FFI declarations for functions with string parameters */#}
+    {% for func in ci.function_definitions() %}
+    {%- if func|has_string_arguments %}
+    [DllImport("{{ config.cdylib_name() }}", CallingConvention = CallingConvention.Cdecl)]
+    public static extern unsafe {% match func.ffi_func().return_type() %}{%- when Some with (type_) %} {{ type_.borrow()|ffi_type_name }}{% when None %} void{% endmatch %} {{ func.ffi_func().name() }}_raw(
+        {%- for arg in func.arguments() %}
+        {%- if arg|type_name(ci) == "string" %}
+        byte* {{ arg.name()|var_name }}_ptr,
+        int {{ arg.name()|var_name }}_len{%- if !loop.last -%},{%- else -%}{%- if func.ffi_func().has_rust_call_status_arg() -%},{%- endif -%}{%- endif -%}
+        {%- else %}
+        {% match arg|ffi_type %}{%- when type_ %}{{ type_|arg_type_name }}{% endmatch %} {{ arg.name()|var_name }}{%- if !loop.last || func.ffi_func().has_rust_call_status_arg() -%},{%- endif -%}
+        {%- endif %}
+        {%- endfor %}
+        {%- if func.ffi_func().has_rust_call_status_arg() %}ref UniffiRustCallStatus _uniffi_out_err{% endif %}
+    );
+
+    {% endif %}
+    {% endfor %}
+    {%- endif %}
+
     static void uniffiCheckContractApiVersion() {
         var scaffolding_contract_version = _UniFFILib.{{ ci.ffi_uniffi_contract_version().name() }}();
         if ({{ ci.uniffi_contract_version() }} != scaffolding_contract_version) {

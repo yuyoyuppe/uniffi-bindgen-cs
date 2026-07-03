@@ -84,6 +84,12 @@ pub struct Config {
     null_string_to_empty: Option<bool>,
     #[serde(default)]
     omit_checksums: bool,
+    /// Enable high-performance string handling using ReadOnlySpan<byte>.
+    /// This generates dual APIs: standard versions + zero-copy span versions for
+    /// functions with string arguments (which cross as ptr+len via hand-exported
+    /// `{ffi_func_name}_raw` symbols).
+    #[serde(default)]
+    pub(super) high_performance_strings: bool,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -139,6 +145,10 @@ impl Config {
             Some(name) => name.clone(),
             None => format!("uniffi.{}", namespace.unwrap_or(module_path)),
         }
+    }
+
+    pub fn high_performance_strings(&self) -> bool {
+        self.high_performance_strings
     }
 }
 

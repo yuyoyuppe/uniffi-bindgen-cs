@@ -43,6 +43,18 @@ pub(super) fn canonical_name(as_ct: &impl AsCodeType) -> Result<String, askama::
     Ok(as_ct.as_codetype().canonical_name())
 }
 
+/// Whether the function has at least one plain `String` argument. Used by the
+/// `high_performance_strings` fast path to decide when span variants exist.
+pub(super) fn has_string_arguments(
+    func: &uniffi_bindgen::interface::Function,
+) -> Result<bool, askama::Error> {
+    use uniffi_bindgen::interface::AsType;
+    Ok(func
+        .arguments()
+        .iter()
+        .any(|arg| matches!(arg.as_type(), Type::String)))
+}
+
 pub(super) fn ffi_converter_name(as_ct: &impl AsCodeType) -> Result<String, askama::Error> {
     Ok(as_ct.as_codetype().ffi_converter_name())
 }
