@@ -55,13 +55,13 @@ static class _UniFFILib {
     {% endfor %}
 
     {%- if config.high_performance_strings() %}
-    {#/* Generate _raw FFI declarations for functions with string parameters */#}
+    {#/* Generate _raw FFI declarations for functions with string/bytes parameters */#}
     {% for func in ci.function_definitions() %}
-    {%- if func|has_string_arguments %}
+    {%- if func|has_span_arguments %}
     [DllImport("{{ config.cdylib_name() }}", CallingConvention = CallingConvention.Cdecl)]
     public static extern unsafe {% match func.ffi_func().return_type() %}{%- when Some with (type_) %} {{ type_.borrow()|ffi_type_name }}{% when None %} void{% endmatch %} {{ func.ffi_func().name() }}_raw(
         {%- for arg in func.arguments() %}
-        {%- if arg|type_name(ci) == "string" %}
+        {%- if arg|is_span_arg %}
         byte* {{ arg.name()|var_name }}_ptr,
         int {{ arg.name()|var_name }}_len{%- if !loop.last -%},{%- else -%}{%- if func.ffi_func().has_rust_call_status_arg() -%},{%- endif -%}{%- endif -%}
         {%- else %}

@@ -43,16 +43,29 @@ pub(super) fn canonical_name(as_ct: &impl AsCodeType) -> Result<String, askama::
     Ok(as_ct.as_codetype().canonical_name())
 }
 
-/// Whether the function has at least one plain `String` argument. Used by the
+fn is_span_fast_path_type(type_: &Type) -> bool {
+    matches!(type_, Type::String | Type::Bytes)
+}
+
+/// Whether the argument crosses as a borrowed `byte* + length` pair in the
+/// `high_performance_strings` span fast path (plain strings and byte arrays).
+pub(super) fn is_span_arg(
+    arg: &uniffi_bindgen::interface::Argument,
+) -> Result<bool, askama::Error> {
+    use uniffi_bindgen::interface::AsType;
+    Ok(is_span_fast_path_type(&arg.as_type()))
+}
+
+/// Whether the function has at least one span-fast-path argument. Used by the
 /// `high_performance_strings` fast path to decide when span variants exist.
-pub(super) fn has_string_arguments(
+pub(super) fn has_span_arguments(
     func: &uniffi_bindgen::interface::Function,
 ) -> Result<bool, askama::Error> {
     use uniffi_bindgen::interface::AsType;
     Ok(func
         .arguments()
         .iter()
-        .any(|arg| matches!(arg.as_type(), Type::String)))
+        .any(|arg| is_span_fast_path_type(&arg.as_type())))
 }
 
 pub(super) fn ffi_converter_name(as_ct: &impl AsCodeType) -> Result<String, askama::Error> {

@@ -13,7 +13,7 @@
 {%- match func.return_type() -%}
 {%- when Some with (return_type) %}
     public static {{ return_type|type_name(ci) }} {{ func.name()|fn_name }}({%- call cs::arg_list_decl(func) -%}) {
-        {%- if config.high_performance_strings() && func|has_string_arguments %}
+        {%- if config.high_performance_strings() && func|has_span_arguments %}
         {#/* Delegate to the span variant, encoding string arguments as UTF-8 */#}
         {%- for arg in func.arguments() %}
         {%- if arg|type_name(ci) == "string" %}
@@ -37,7 +37,7 @@
     }
 {% when None %}
     public static void {{ func.name()|fn_name }}({% call cs::arg_list_decl(func) %}) {
-        {%- if config.high_performance_strings() && func|has_string_arguments %}
+        {%- if config.high_performance_strings() && func|has_span_arguments %}
         {#/* Delegate to the span variant, encoding string arguments as UTF-8 */#}
         {%- for arg in func.arguments() %}
         {%- if arg|type_name(ci) == "string" %}
@@ -61,16 +61,16 @@
 {% endmatch %}
 {% endif  %}
 
-{#/* Generate high-performance span version for functions with string args */#}
+{#/* Generate high-performance span version for functions with string/bytes args */#}
 {%- if config.high_performance_strings() %}
 {%- if !func.is_async() %}
-{%- if func|has_string_arguments %}
+{%- if func|has_span_arguments %}
 
 {#/* Generate the span variant of the function */#}
     /// <summary>
     /// High-performance variant using ReadOnlySpan&lt;byte&gt; for zero-copy handling.
-    /// String parameters are passed as UTF-8 encoded spans, avoiding RustBuffer
-    /// allocations.
+    /// String parameters are passed as UTF-8 encoded spans and byte arrays as raw
+    /// spans, avoiding RustBuffer allocations.
     /// </summary>
 {%- call cs::method_throws_annotation(func.throws_type()) %}
 {%- match func.return_type() -%}
@@ -79,6 +79,8 @@
         {%- for arg in func.arguments() -%}
             {%- if arg|type_name(ci) == "string" -%}
                 ReadOnlySpan<byte> {{ arg.name()|var_name }}Utf8
+            {%- else if arg|is_span_arg -%}
+                ReadOnlySpan<byte> {{ arg.name()|var_name }}
             {%- else -%}
                 {{ arg|type_name(ci) }} {{ arg.name()|var_name }}
             {%- endif -%}
@@ -90,6 +92,8 @@
         {%- for arg in func.arguments() %}
         {%- if arg|type_name(ci) == "string" %}
         fixed (byte* {{ arg.name()|var_name }}Ptr = {{ arg.name()|var_name }}Utf8)
+        {%- else if arg|is_span_arg %}
+        fixed (byte* {{ arg.name()|var_name }}Ptr = {{ arg.name()|var_name }})
         {%- endif %}
         {%- endfor %}
         {
@@ -98,6 +102,9 @@
                 {%- if arg|type_name(ci) == "string" %}
                 {{ arg.name()|var_name }}Ptr,
                 {{ arg.name()|var_name }}Utf8.Length
+                {%- else if arg|is_span_arg %}
+                {{ arg.name()|var_name }}Ptr,
+                {{ arg.name()|var_name }}.Length
                 {%- else %}
                 {{ arg|lower_fn }}({{ arg.name()|var_name }})
                 {%- endif %}
@@ -121,6 +128,8 @@
         {%- for arg in func.arguments() -%}
             {%- if arg|type_name(ci) == "string" -%}
                 ReadOnlySpan<byte> {{ arg.name()|var_name }}Utf8
+            {%- else if arg|is_span_arg -%}
+                ReadOnlySpan<byte> {{ arg.name()|var_name }}
             {%- else -%}
                 {{ arg|type_name(ci) }} {{ arg.name()|var_name }}
             {%- endif -%}
@@ -132,6 +141,8 @@
         {%- for arg in func.arguments() %}
         {%- if arg|type_name(ci) == "string" %}
         fixed (byte* {{ arg.name()|var_name }}Ptr = {{ arg.name()|var_name }}Utf8)
+        {%- else if arg|is_span_arg %}
+        fixed (byte* {{ arg.name()|var_name }}Ptr = {{ arg.name()|var_name }})
         {%- endif %}
         {%- endfor %}
         {
@@ -140,6 +151,9 @@
                 {%- if arg|type_name(ci) == "string" %}
                 {{ arg.name()|var_name }}Ptr,
                 {{ arg.name()|var_name }}Utf8.Length
+                {%- else if arg|is_span_arg %}
+                {{ arg.name()|var_name }}Ptr,
+                {{ arg.name()|var_name }}.Length
                 {%- else %}
                 {{ arg|lower_fn }}({{ arg.name()|var_name }})
                 {%- endif %}
